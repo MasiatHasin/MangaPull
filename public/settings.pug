@@ -1,0 +1,76 @@
+extends layout
+
+block content
+  .container
+    .row.justify-content-center
+      .col-11.mt-5
+        a(href="/")
+          svg.bi.bi-house-door-fill(xmlns='http://www.w3.org/2000/svg', width='22', height='22', fill='currentColor', viewBox='0 0 16 16')
+            path(d='M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5Z')
+    .row.justify-content-center
+      .col-8.mt-5
+        form(id="settings" action="/saveSettings" method="POST")
+          table.table.table-responsive.table-borderless(style="color:white")
+            tbody
+              tr
+                th(scope='col') Default Format
+                th(scope='col') 
+                  .form-check
+                    if format == 'PDF'
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="PDF", checked='')
+                    else
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="PDF")
+                    label.form-check-label(for='flexRadioDefault1')
+                      | PDF
+                  .form-check
+                    if format=='CBZ'
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="CBZ", checked='')
+                    else
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="CBZ")
+                    label.form-check-label(for='flexRadioDefault2')
+                      | CBZ
+                  .form-check
+                    if format=='Raw'
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="Raw" ,checked='')
+                    else
+                      input#flexRadioDefault1.form-check-input(type='radio', name='setform', value="Raw")
+                    label.form-check-label(for='flexRadioDefault2')
+                      | Raw Images
+              tr
+                th(scope='col') Default Quality
+                th(scope='col')
+                  .form-check
+                    if quality == 'Original'
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Original", checked='')
+                    else
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Original")
+                    label.form-check-label(for='flexRadioDefault1')
+                      | Original 
+                    p(style="font-size: 12px;") Warning! This can result in very large files. 
+                  .form-check
+                    if quality == 'High'
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="High", checked='')
+                    else
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="High")
+                    label.form-check-label(for='flexRadioDefault1')
+                      | High
+                  .form-check
+                    if quality == 'Medium'
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Medium", checked='')
+                    else
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Medium")
+                    label.form-check-label(for='flexRadioDefault2')
+                      | Medium
+                  .form-check
+                    if quality == 'Low'
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Low", checked='')
+                    else
+                      input#flexRadioDefault2.form-check-input(type='radio', name='setqual', value="Low")
+                    label.form-check-label(for='flexRadioDefault2')
+                      | Low
+              tr
+                th(scope='col') Download Location 
+                th(scope='col') 
+                    input.form-control.input-sm(type='text' name='setdir' value=directory aria-describedby='basic-addon2' autocomplete="off")
+          .col-md-12.text-center
+            button.btn.btn-sample.text-center(onclick="settings()" type='submit' style='width:80px !important;') Save

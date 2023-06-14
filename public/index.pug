@@ -1,0 +1,97 @@
+extends layout
+
+block content
+  .container
+    .row.justify-content-center(style='margin-top: 0px')
+      .col-11.mt-5
+        a(href="/")
+          svg.bi.bi-house-door-fill(xmlns='http://www.w3.org/2000/svg', width='22', height='22', fill='currentColor', viewBox='0 0 16 16')
+            path(d='M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5Z')
+        a(href="/settings").float-end
+          svg.bi.bi-gear-fill(xmlns='http://www.w3.org/2000/svg', width='22', height='22', fill='currentColor', viewBox='0 0 16 16')
+            path(d='M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.705-1.987 1.987l.169.311c.446.82.023 1.841-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.698 1.283.705 2.686 1.987 1.987l.311-.169a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.698 2.686-.705 1.987-1.987l-.169-.311a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.698-1.283-.705-2.686-1.987-1.987l-.311.169a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z')
+    .row.justify-content-center(style='margin-top: 0px')
+      .col-10.mt-2
+        if chap.length>0
+          .mt-3.s-10.d-flex
+           
+              img.shadow.p-1.bg-white.rounded(src=cover style='align-self: start; width:120; height:auto;')
+              .s-10.d-flex(style="flex-direction:column; padding-left: 10px;")
+                p(style="font-size:20px;")=title
+                p=author[0]
+                p=desc
+             
+          .mt-3.s-10.d-flex
+              p Download Settings
+          .s-10.d-flex
+              select.selectpicker.format.deactivate(title='Format')
+                option PDF
+                option CBZ
+                option Raw
+              select.selectpicker.quality.deactivate(title='Quality')
+                option High
+                option Medium 
+                option Low
+              form.result(id="result")
+                input(style="display:none;" type='text' id='sets' name='sets', value=set)
+                input(style="display:none;" type='text' id='chaps' name='chaps', value=0)
+                input(style="display:none;" type='text' id='format' name='format', value=format)
+                input(style="display:none;" type='text' id='quality' name='quality', value=quality)
+                input(style="display:none;" type='text' id='dir' name='dir', value=directory)
+                input(style="display:none;" type='text' id='chap' name='chap', value=chap)
+                input(style="display:none;" type='text' id='url' name='url', value=url)
+                input(style="display:none;" type='text' id='title' name='title', value=title)
+                input(style="display:none;" type='text' id='client' name='client', value=client)
+              button.btn.btn-sample.deactivate(id="submit" onclick="once()" style="height: 38px; margin-left: 5px;")
+                p Download
+
+              .flex-column.w-100
+                .progress(style="height: 10px; margin-left: 5px; margin-top: 2px;")
+                  .progress-bar.progress-bar-striped.progress-bar-animated(id="prog" name="prog" style='width:0%') 70%
+                .text-center(id="status" name="status" style="font-size: 12px;")
+          .mt-3.s-10.d-flex
+            span(style="margin-right: 10px") Already Downloaded
+            .box(style="background-color: #A51C30") PDF 
+            .box(style="background-color: #ED2939") CBZ 
+            .box(style="background-color: #F08080") PDF+CBZ
+
+          .row.mt-3.s-10.deactivate
+            each val, index in chap
+              .col-3.col-sm-2.col-md-2.col-lg-2.col-xl-1.py-2
+                .card.shadow-sm.border-0.h-100.cardhover(id=val name=val onclick="select('"+val+"');")
+                  if dled[index] == 0
+                    .card-body(style='padding:6px')
+                      if val!="Oneshot"
+                        p.text-center(style='margin:2px')= val
+                      else 
+                        p.text-center(style='margin:2px; font-size: 10px !important;')=val
+                        //p= val.localizedTitle[Object.keys(val.localizedTitle)[0]]
+                  if dled[index] == 1
+                    .card-body(style='padding:6px; background-color: #A51C30; color: white !important')
+                      if val!="Oneshot"
+                        p.text-center(style='margin:2px')= val 
+                      else 
+                        p.text-center(style='margin:2px; font-size: 10px !important;')=val
+                  if dled[index] == 2
+                    .card-body(style='padding:6px; background-color: #ED2939; color: white !important')
+                      if val!="Oneshot"
+                        p.text-center(style='margin:2px')= val 
+                      else 
+                        p.text-center(style='margin:2px; font-size: 10px !important;')=val
+                  if dled[index] == 3
+                    .card-body(style='padding:6px; background-color: #F08080; color: white !important')
+                      if val!="Oneshot"
+                        p.text-center(style='margin:2px')= val 
+                      else 
+                        p.text-center(style='margin:2px; font-size: 10px !important;')=val
+
+        else 
+          if res==1
+            p.py-4.text-center There are no Chapters here.
+         
+              
+
+
+          
+
+                
