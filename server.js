@@ -585,10 +585,3 @@ app.post('/Raw', urlencodedParser, async function (req, res) {
 server.listen(8081, function () {
 
 })
-
-const win = nw.Window.open('http://127.0.0.1:8081', {
-  fullscreen: false, // Open the window in fullscreen mode
-  //frame: false,
-  width: window.screen.width,
-  height: window.screen.height,
-});
