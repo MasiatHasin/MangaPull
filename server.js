@@ -101,7 +101,7 @@ async function fetchImage(pages) {
     const response = await axios.get(pages, {
       responseType: 'arraybuffer',
       maxContentLength: 100000000,
-      maxBodyLength: 100000000
+        maxBodyLength: 1000000000
     });
     return response.data;
   } catch (error) {
@@ -197,6 +197,61 @@ function getBoth(chapter) {
     }
   }
   return dic;
+}
+
+async function raw(dir, chapterList, chapterSets, qlty){
+  done = 0;
+  io.emit('status', 'Evaluating resources to be downloaded...');
+    chapters = []
+    for (chapterIdx = 0; chapterIdx < chapterList.length; chapterIdx++) {
+      console.log(chapterSets[chapterList[chapterIdx]])
+      let chapter = await MFA.Chapter.get(chapterSets[chapterList[chapterIdx]])
+      chapters.push(chapter);
+    }
+
+    io.emit('status', 'Retrieving chapters...');
+    for (chapterIdx = 0; chapterIdx < chapters.length; chapterIdx++) {
+      if (fs.existsSync(dir+'/chapter_'+chapterList[chapterIdx]) == false ){
+      let chapter = chapters[chapterIdx]
+      try {
+        pages = await chapter.getReadablePages()
+      }
+      catch {
+        try {
+          let aggr = await MFA.Manga.getAggregate(url[4], 'en');
+          var chaps = jp.query(aggr, '$..' + chapters[chapterIdx]);
+          chapter = chaps[0].others[0]
+          chapter = await MFA.Chapter.get(chapter)
+          console.log(chapter)
+          pages = await chapter.getReadablePages()
+        }
+        catch {
+          continue
+        }
+      }
+      io.emit('status', 'Preparing Chapter ' + chapterList[chapterIdx] + "...");
+      //const buffers = await Promise.all(pages.map(fetchImage));
+
+      io.emit('status', 'Downloading Raw Images...');
+      for (i = 0; i < pages.length; i++) {
+        saveTo = dir + '/chapter_' + chapterList[chapterIdx]
+        if (!fs.existsSync(saveTo)) {
+          fs.mkdirSync(saveTo, { recursive: true });
+        }
+        j = i + 1
+        buffer = await fetchImage(pages[i])
+        fs.writeFileSync(dir + '/chapter_' + chapterList[chapterIdx] + '/' + j + '.jpg', Buffer.from(buffer));
+        io.emit('prog', [done, chapterList.length]);
+        if (done == chapterList.length) {
+          io.emit('end')
+        }
+      }
+      done += 1
+    }
+    else{
+      io.emit('status', 'Raw images already exist');
+    }
+  }
 }
 
 app.get('/getManga', urlencodedParser, async function (req, res) {
@@ -309,70 +364,36 @@ app.post('/PDF', urlencodedParser, async function (req, res) {
     qlty = 100;
   }
   console.log(qlty)
-
-  try{
+  raw(dir, chapterList, chapterSets, qlty).then(async (result) => {
     const zip = new JSZip();
 
-    io.emit('status', 'Evaluating resources to be downloaded...');
-    chapters = []
     for (chapterIdx = 0; chapterIdx < chapterList.length; chapterIdx++) {
-      console.log(chapterSets[chapterList[chapterIdx]])
-      let chapter = await MFA.Chapter.get(chapterSets[chapterList[chapterIdx]])
-      totpages += chapter.pages;
-      chapters.push(chapter);
-    }
-
-    io.emit('status', 'Retrieving chapters..');
-    for (chapterIdx = 0; chapterIdx < chapters.length; chapterIdx++) {
-      let chapter = chapters[chapterIdx]
-      try {
-        pages = await chapter.getReadablePages()
-      }
-      catch {
-        try {
-          let aggr = await MFA.Manga.getAggregate(url[4], 'en');
-          var chaps = jp.query(aggr, '$..' + chapterList[chapterIdx]);
-          if (chaps.length == 1) {
-            chapter = chaps[0].others[0]
-          }
-          else if (chaps.length > 1) {
-            chapter = chaps[1].others[0]
-          }
-          chapter = await MFA.Chapter.get(chapter)
-          console.log(chapter)
-          pages = await chapter.getReadablePages()
-          totpages += chapter.pages;
-        }
-        catch {
-          continue
-        }
-      }
-      io.emit('status', 'Preparing Chapter ' + chapterList[chapterIdx] + "...");
-      //const buffers = await Promise.all(pages.map(fetchImage));
-      const buffers = await fetchAllImages(pages, 10);
-
-      io.emit('status', 'Initializing PDF file...');
-      mid = Math.floor((pages.length / 2))
-      dim = sizeOf(Buffer.from(await fetchImage(pages[mid])))
+      io.emit('status', 'Generating PDF file...');
+      imageDirectory = dir+'/chapter_'+chapterList[chapterIdx]
+      var imageFiles = fs.readdirSync(imageDirectory).filter((file) => {
+        return file.toLowerCase().endsWith('.jpg') || file.toLowerCase().endsWith('.jpeg') || file.toLowerCase().endsWith('.png');
+      });
+      ext = (imageFiles[0].split("."))[1]
+      imageFiles = imageFiles.map((str) => parseInt(str, 10));
+      imageFiles.sort((a, b) => a - b);
+      console.log(imageFiles)
+      mid = Math.floor(imageFiles.length / 2)
+      dim = sizeOf(dir+'/chapter_'+chapterList[chapterIdx]+'/'+imageFiles[mid]+'.'+ext)
+      console.log(dim)
       const doc = new PDFDocument({ size: [dim.width, dim.height], margin: 0 })
 
-      const pageBuffers = [];
-      doc.on('data', (buffer) => {
-        pageBuffers.push(buffer);
-      });
+      const writeStream = fs.createWriteStream(dir+'/chapter_'+chapterList[chapterIdx]+'.pdf');
+      doc.pipe(writeStream);
 
       io.emit('status', 'Generating PDF file...');
-      for (i = 0; i < buffers.length; i++) {
-        if (shouldStop) {
-          return;
-        }
-        //console.log(buffers[i])
-        const buffer = await compressImage(Buffer.from(buffers[i]), qlty);
+      for (i = 0; i < imageFiles.length; i++) {
         donepages += 1
         io.emit('prog', [donepages, totpages]);
         if (donepages == totpages) {
           io.emit('end')
         }
+        const image = dir+'/chapter_'+chapterList[chapterIdx]+'/'+imageFiles[i]+'.'+ext;
+        const buffer = await compressImage(image, qlty);
         doc.image(buffer, {
           fit: [dim.width, dim.height],
           align: 'center',
@@ -381,15 +402,13 @@ app.post('/PDF', urlencodedParser, async function (req, res) {
         doc.addPage();
       }
       doc.end();
-      const pdfData = Buffer.concat(pageBuffers);
-      io.emit('status', 'Saving PDF...');
-      fs.writeFileSync(dir + '/chapter_' + chapterList[chapterIdx] + '.pdf', pdfData);
     }
 
     res.redirect("/getChapter?search="+search)
-  } catch(e){
-    res.render('error.pug', { type: 1 })
-  }
+  })
+  .catch((error) => {
+    console.error(error);
+  });
 });
 
 app.post('/CBZ', urlencodedParser, async function (req, res) {
@@ -427,67 +446,31 @@ app.post('/CBZ', urlencodedParser, async function (req, res) {
   }
   console.log(qlty)
 
-  try{
-    const zip = new JSZip();
+    const archive = new JSZip();
+    raw(dir, chapterList, chapterSets, qlty).then(async (result) => {
 
-    io.emit('status', 'Evaluating resources to be downloaded...');
-    chapters = []
-    for (chapterIdx = 0; chapterIdx < chapterList.length; chapterIdx++) {
-      console.log(chapterSets[chapterList[chapterIdx]])
-      let chapter = await MFA.Chapter.get(chapterSets[chapterList[chapterIdx]])
-      totpages += chapter.pages;
-      chapters.push(chapter);
-    }
-
-    io.emit('status', 'Retrieving chapters...');
-    for (chapterIdx = 0; chapterIdx < chapters.length; chapterIdx++) {
-      let chapter = chapters[chapterIdx]
-      try {
-        pages = await chapter.getReadablePages()
-      }
-      catch {
-        try {
-          let aggr = await MFA.Manga.getAggregate(url[4], 'en');
-          var chaps = jp.query(aggr, '$..' + chapters[chapterIdx]);
-          chapter = chaps[0].others[0]
-          chapter = await MFA.Chapter.get(chapter)
-          console.log(chapter)
-          pages = await chapter.getReadablePages()
-          totpages += chapter.pages;
-        }
-        catch {
-          continue
-        }
-      }
-      io.emit('status', 'Preparing Chapter ' + chapterList[chapterIdx] + "...");
-      const buffers = await Promise.all(pages.map(fetchImage));
-
-      io.emit('status', 'Generating CBZ...');
-      for (i = 0; i < buffers.length; i++) {
-        const buffer = await compressImage(Buffer.from(buffers[i]), qlty);
-        zip.file(`img${i}.jpg`, buffer, { binary: true })
-        donepages += 1
-        io.emit('prog', [donepages, totpages]);
-        if (donepages == totpages) {
-          io.emit('end')
-        }
-      }
-
-      const fzip = await zip.generateAsync({
-        type: 'nodebuffer', compression: "DEFLATE", compressionOptions: {
-          level: 9
-        }
-      }).then(content => {
-        io.emit('status', 'Saving CBZ... ');
-        fs.writeFileSync(dir + '/chapter_' + chapterList[chapterIdx] + '.cbz', Buffer.from(content));
+      for (chapterIdx = 0; chapterIdx < chapterList.length; chapterIdx++) {
+        io.emit('status', 'Generating PDF file...');
+        const output = dir+'/chapter_'+chapterList[chapterIdx]+'.cbz';
+      imageDirectory = dir+'/chapter_'+chapterList[chapterIdx]
+      var imageFiles = fs.readdirSync(imageDirectory).filter((file) => {
+        return file.toLowerCase().endsWith('.jpg') || file.toLowerCase().endsWith('.jpeg') || file.toLowerCase().endsWith('.png');
       });
-    }
-
-    res.redirect("/getChapter?search="+search)
-
-  } catch(e){
-    res.render('error.pug', { type: 1 })
+          
+      for (const imageFile of imageFiles) {
+        const imagePath = dir+'/chapter_'+chapterList[chapterIdx]+'/'+imageFiles[i];
+        const imageContent = fs.readFileSync(imagePath);
+        const buffer = await compressImage(imageContent, qlty);
+        archive.file(imageFile, buffer);
+      }
+    
+      archive.generateNodeStream({ type: 'nodebuffer', streamFiles: true })
+    .pipe(fs.createWriteStream(output))
+    .on('finish', () => {
+    });
   }
+    });
+    res.redirect("/getChapter?search="+search)
 });
 
 app.post('/Raw', urlencodedParser, async function (req, res) {
@@ -527,53 +510,7 @@ app.post('/Raw', urlencodedParser, async function (req, res) {
 
   try{
 
-    io.emit('status', 'Evaluating resources to be downloaded...');
-    chapters = []
-    for (chapterIdx = 0; chapterIdx < chapterList.length; chapterIdx++) {
-      console.log(chapterSets[chapterList[chapterIdx]])
-      let chapter = await MFA.Chapter.get(chapterSets[chapterList[chapterIdx]])
-      totpages += chapter.pages;
-      chapters.push(chapter);
-    }
-
-    io.emit('status', 'Retrieving chapters...');
-    for (chapterIdx = 0; chapterIdx < chapters.length; chapterIdx++) {
-      let chapter = chapters[chapterIdx]
-      try {
-        pages = await chapter.getReadablePages()
-      }
-      catch {
-        try {
-          let aggr = await MFA.Manga.getAggregate(url[4], 'en');
-          var chaps = jp.query(aggr, '$..' + chapters[chapterIdx]);
-          chapter = chaps[0].others[0]
-          chapter = await MFA.Chapter.get(chapter)
-          console.log(chapter)
-          pages = await chapter.getReadablePages()
-          totpages += chapter.pages;
-        }
-        catch {
-          continue
-        }
-      }
-      io.emit('status', 'Preparing Chapter ' + chapterList[chapterIdx] + "...");
-      const buffers = await Promise.all(pages.map(fetchImage));
-
-      io.emit('status', 'Downloading Raw Images...');
-      for (i = 0; i < buffers.length; i++) {
-        saveTo = dir + '/chapter_' + chapterList[chapterIdx]
-        if (!fs.existsSync(saveTo)) {
-          fs.mkdirSync(saveTo, { recursive: true });
-        }
-        j = i + 1
-        fs.writeFileSync(dir + '/chapter_' + chapterList[chapterIdx] + '/' + j + '.jpg', Buffer.from(buffers[i]));
-        donepages += 1
-        io.emit('prog', [donepages, totpages]);
-        if (donepages == totpages) {
-          io.emit('end')
-        }
-      }
-    }
+    raw(dir, chapterList, chapterSets, qlty);
 
     res.redirect("/getChapter?search="+search)
 
